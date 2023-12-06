@@ -1,0 +1,26 @@
+{
+    "root": "/home/ssk/Desktop/Master Thesis/code/mlp-master-thesis-personalization-main/movielens",
+    "program": "experiment.py",
+    "startedAt": "2023-11-24T14:00:47.779180",
+    "host": "ssk-G5-5590",
+    "username": "ssk",
+    "executable": "/home/ssk/anaconda3/envs/decision-transformer-climate/bin/python",
+    "os": "Linux-5.4.0-167-generic-x86_64-with-glibc2.10",
+    "python": "3.8.5",
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "args": [
+        "--log_to_wandb",
+        "True",
+        "--num_steps_per_iter",
+        "10"
+    ],
+    "state": "finished",
+    "jobType": null,
+    "mode": "run",
+    "name": "gym-experiment-mlens-medium-487701",
+    "project": "decision-transformer",
+    "heartbeatAt": "2023-11-24T14:02:13.436289",
+    "exitcode": 0
+}
