@@ -1,0 +1,107 @@
+wandb_version: 1
+
+env:
+  desc: null
+  value: mlens
+dataset:
+  desc: null
+  value: naive
+mode:
+  desc: null
+  value: normal
+K:
+  desc: null
+  value: 20
+pct_traj:
+  desc: null
+  value: 1.0
+batch_size:
+  desc: null
+  value: 64
+model_type:
+  desc: null
+  value: dt
+embed_dim:
+  desc: null
+  value: 128
+n_layer:
+  desc: null
+  value: 3
+n_head:
+  desc: null
+  value: 1
+activation_function:
+  desc: null
+  value: relu
+dropout:
+  desc: null
+  value: 0.1
+learning_rate:
+  desc: null
+  value: 0.0001
+weight_decay:
+  desc: null
+  value: 0.0001
+warmup_steps:
+  desc: null
+  value: 10000
+num_eval_episodes:
+  desc: null
+  value: 10
+max_iters:
+  desc: null
+  value: 10
+num_steps_per_iter:
+  desc: null
+  value: 100
+max_ep_len:
+  desc: null
+  value: 100
+device:
+  desc: null
+  value: cuda
+log_to_wandb:
+  desc: null
+  value: true
+use_prev_temp_as_feature:
+  desc: null
+  value: 'no'
+use_personalized_embeddings:
+  desc: null
+  value: 'yes'
+action_embed_shape:
+  desc: null
+  value: 16
+_wandb:
+  desc: null
+  value:
+    python_version: 3.8.5
+    cli_version: 0.16.1
+    framework: huggingface
+    huggingface_version: 4.5.1
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1703063748.379324
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 11
+      - 53
+      - 55
+      3:
+      - 13
+      - 16
+      - 23
+      4: 3.8.5
+      5: 0.16.1
+      6: 4.5.1
+      8:
+      - 5
+      13: linux-x86_64

@@ -1,0 +1,107 @@
+{
+    "os": "Linux-5.4.0-167-generic-x86_64-with-glibc2.10",
+    "python": "3.8.5",
+    "heartbeatAt": "2023-11-24T15:08:26.392897",
+    "startedAt": "2023-11-24T15:08:24.411374",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--log_to_wandb",
+        "True",
+        "--num_steps_per_iter",
+        "100"
+    ],
+    "state": "running",
+    "program": "experiment.py",
+    "codePathLocal": "experiment.py",
+    "codePath": "experiment.py",
+    "host": "ssk-G5-5590",
+    "username": "ssk",
+    "executable": "/home/ssk/anaconda3/envs/decision-transformer-climate/bin/python",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 3.1289166666666666,
+        "min": 800.0,
+        "max": 4100.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3.27,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.293,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.019,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.135,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.183,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2.921,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.008,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.201,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.005,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2.925,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.293,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3.294,
+            "min": 800.0,
+            "max": 4100.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 245.01800918579102,
+            "used": 221.63403701782227
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2060",
+            "memory_total": 6222839808
+        }
+    ],
+    "memory": {
+        "total": 15.437393188476562
+    }
+}

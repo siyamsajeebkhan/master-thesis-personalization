@@ -1,0 +1,111 @@
+{
+    "os": "Linux-6.2.0-37-generic-x86_64-with-glibc2.10",
+    "python": "3.8.5",
+    "heartbeatAt": "2023-12-07T05:27:00.180016",
+    "startedAt": "2023-12-07T05:26:59.202131",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--log_to_wandb",
+        "True"
+    ],
+    "state": "running",
+    "program": "experiment.py",
+    "codePathLocal": "experiment.py",
+    "codePath": "movielens-continuous-actions/experiment.py",
+    "git": {
+        "remote": "git@github.com:siyamsajeebkhan/master-thesis-personalization.git",
+        "commit": "33ce02d1583719ba5bb5d4d95365ae491ad9b692"
+    },
+    "email": null,
+    "root": "/home/ssk/Desktop/master-thesis/master-thesis-personalization",
+    "host": "ssk-G5-5590",
+    "username": "ssk",
+    "executable": "/home/ssk/miniconda3/envs/decision-transformer-climate-test/bin/python",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2531.4775833333333,
+        "min": 800.0,
+        "max": 4100.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2697.998,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2694.211,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2200.0,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 3083.757,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2691.007,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2200.0,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2200.0,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2998.114,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2643.101,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2593.012,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2508.354,
+            "min": 800.0,
+            "max": 4100.0
+        },
+        {
+            "current": 2400.9,
+            "min": 800.0,
+            "max": 4100.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 467.8897895812988,
+            "used": 50.26658630371094
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2060",
+            "memory_total": 6442450944
+        }
+    ],
+    "memory": {
+        "total": 15.425289154052734
+    }
+}
