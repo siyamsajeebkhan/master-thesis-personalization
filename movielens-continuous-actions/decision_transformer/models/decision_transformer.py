@@ -44,7 +44,9 @@ class DecisionTransformer(TrajectoryModel):
         self.embed_return = torch.nn.Linear(1, hidden_size)
         self.embed_state = torch.nn.Linear(self.state_dim, hidden_size)
         self.embed_action = torch.nn.Linear(self.act_dim, hidden_size)
-        self.embed_users = torch.nn.Linear(self.user_embedding_dim, hidden_size)
+
+        if self.user_embedding_dim is not None:
+            self.embed_users = torch.nn.Linear(self.user_embedding_dim, hidden_size)
 
         self.embed_ln = nn.LayerNorm(hidden_size)
 
@@ -91,7 +93,7 @@ class DecisionTransformer(TrajectoryModel):
         state_embeddings = state_embeddings + time_embeddings
         action_embeddings = action_embeddings + time_embeddings
         returns_embeddings = returns_embeddings + time_embeddings
-        if user_embeddings is not None and self.config.fusion_strategy == 'early':
+        if user_embeddings is not None and len(user_embeddings) != 0 and self.config.fusion_strategy == 'early':
             # print(f"taking steps for early fusion")
             user_embeddings = self.embed_users(user_embeddings)
             state_embeddings = state_embeddings + user_embeddings
@@ -232,13 +234,18 @@ class DecisionTransformer(TrajectoryModel):
         actions = actions.reshape(1, -1, self.act_dim)
         returns_to_go = returns_to_go.reshape(1, -1, 1)
         timesteps = timesteps.reshape(1, -1)
-        user_features = user_features.reshape(1, -1, self.user_embedding_dim)
+
+        if user_features is not None:
+            user_features = user_features.reshape(1, -1, self.user_embedding_dim)
+
         if self.max_length is not None:
             states = states[:,-self.max_length:]
             actions = actions[:,-self.max_length:]
             returns_to_go = returns_to_go[:,-self.max_length:]
             timesteps = timesteps[:,-self.max_length:]
-            user_features = user_features[:,-self.max_length:]
+
+            if user_features is not None:
+                user_features = user_features[:,-self.max_length:]
             # pad all tokens to sequence length
             attention_mask = torch.cat([torch.zeros(self.max_length-states.shape[1]), torch.ones(states.shape[1])])
             attention_mask = attention_mask.to(dtype=torch.long, device=states.device).reshape(1, -1)
@@ -256,9 +263,11 @@ class DecisionTransformer(TrajectoryModel):
                 [torch.zeros((timesteps.shape[0], self.max_length-timesteps.shape[1]), device=timesteps.device), timesteps],
                 dim=1
             ).to(dtype=torch.long)
-            user_features = torch.cat(
-                [torch.zeros((user_features.shape[0], self.max_length-user_features.shape[1], self.user_embedding_dim), device=states.device), user_features],
-                dim=1).to(dtype=torch.float32)
+
+            if user_features is not None:
+                user_features = torch.cat(
+                    [torch.zeros((user_features.shape[0], self.max_length-user_features.shape[1], self.user_embedding_dim), device=states.device), user_features],
+                    dim=1).to(dtype=torch.float32)
             # print(f"in dt.py: user_features.shape: {user_features.shape}, states.shape: {states.shape}")
         else:
             attention_mask = None

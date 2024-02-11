@@ -96,11 +96,15 @@ def experiment(
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
     num_timesteps = sum(traj_lens) + 1e-6
 
-    
+    user_embedding_dim = None
 
-    user_features_mean  = np.array(user_specific_features.mean())
-    user_features_std = np.array(user_specific_features.std())
-    
+    user_features_mean = None
+    user_features_std = None
+    if user_specific_features is not None:
+        user_features_mean  = np.array(user_specific_features.mean())
+        user_features_std = np.array(user_specific_features.std())
+        user_embedding_dim = user_specific_features.shape[1]
+        
     # print(state_mean.shape, type(state_mean), user_features_mean.shape, type(user_features_mean))
     state_dim = states.shape[1]
 
@@ -159,7 +163,8 @@ def experiment(
         from decision_transformer.envs.mlens import MovieLensEnv
         max_ep_len = variant['max_ep_len']
         # max_ep_len = 100
-        env_targets = [max_ep_len*5, max_ep_len*3.5]
+        # env_targets = [max_ep_len*5, max_ep_len*3.5]
+        env_targets = [max_ep_len*5]
         # env_targets = [max_ep_len]
         pbar = tqdm(range(max_ep_len), disable=False)
         with open(movie_embeds_to_id_map_path, 'rb') as f:
@@ -173,7 +178,7 @@ def experiment(
         movies_ratings_and_tags = movies_ratings_and_tags.merge(overall_ratings, on='movieId', suffixes=('', '_global'))
 
 
-        env = MovieLensEnv(test_set_path, movie_embed_to_id, movies_ratings_and_tags, use_prev_temp_as_feature=variant['use_prev_temp_as_feature'], van_specific_embeddings=user_specific_features, pbar=pbar)
+        env = MovieLensEnv(test_set_path, movie_embed_to_id, movies_ratings_and_tags, use_prev_temp_as_feature=variant['use_prev_temp_as_feature'], user_specific_features=user_specific_features, pbar=pbar)
         scale = 1
     else:
         raise NotImplementedError
@@ -269,11 +274,12 @@ def experiment(
         def fn(model):
             returns, lengths = [], []
             # eval_action_errors = []
-            all_pred_movie_ids = [] 
+            # all_pred_movie_ids = [] 
+            uniq_movies_predicted_counts = []
             for _ in tqdm(range(num_eval_episodes), disable=False):
                 with torch.no_grad():
                     if model_type == 'dt':
-                        ret, length, movie_ids = evaluate_episode_rtg(
+                        ret, length, movie_ids, uniq_movies_predicted_count = evaluate_episode_rtg(
                             env,
                             state_dim,
                             act_dim,
@@ -304,7 +310,8 @@ def experiment(
                         )
                 returns.append(ret)
                 lengths.append(length)
-                all_pred_movie_ids += movie_ids
+                # all_pred_movie_ids += movie_ids
+                uniq_movies_predicted_counts.append(uniq_movies_predicted_count)
 
             return {
                 # f'target_{target_rew}_eval_action_error': np.mean(eval_action_errors),
@@ -313,7 +320,9 @@ def experiment(
                 f'target_{target_rew}_length_mean': np.mean(lengths),
                 f'target_{target_rew}_length_std': np.std(lengths),
                 # f'target_{target_rew}_predicted_movies': set(all_pred_movie_ids),
-                f'target{target_rew}_number_of_different_movies_predicted': len(set(all_pred_movie_ids)),
+                # f'target{target_rew}_number_of_different_movies_predicted': len(set(all_pred_movie_ids)),
+                f'target{target_rew}_number_of_different_movies': (uniq_movies_predicted_counts),
+                f'target{target_rew}_number_of_different_movies_predicted': sum(uniq_movies_predicted_counts),
             }
         return fn
 
@@ -328,7 +337,7 @@ def experiment(
             max_length=K,
             # vocab_size=1,
             max_ep_len=max_ep_len,
-            user_embedding_dim=user_specific_features.shape[1],
+            user_embedding_dim=user_embedding_dim,
             hidden_size=variant['embed_dim'],
             n_layer=variant['n_layer'],
             n_head=variant['n_head'],

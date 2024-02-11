@@ -16,7 +16,7 @@ class CustomActionSpace(Space):
     
 class MovieLensEnv(gym.Env):
     
-    def __init__(self, test_traj_path, movie_embed_to_id, movies_ratings_and_tags, use_prev_temp_as_feature=False, van_specific_embeddings=None, pbar=None):
+    def __init__(self, test_traj_path, movie_embed_to_id, movies_ratings_and_tags, use_prev_temp_as_feature=False, user_specific_features=None, pbar=None):
         with open(test_traj_path, 'rb') as f:
             self.dataset = pickle.load(f)
 
@@ -32,7 +32,7 @@ class MovieLensEnv(gym.Env):
         self.pbar = pbar
         self.total_steps = 0
         self.use_prev_temp = use_prev_temp_as_feature
-        self.personalized_features = van_specific_embeddings
+        self.personalized_features = user_specific_features
         self.movies_ratings_and_tags = movies_ratings_and_tags
         self.movie_embed_to_id = movie_embed_to_id
 
@@ -68,9 +68,15 @@ class MovieLensEnv(gym.Env):
             self.pbar.set_description(f"(idx, step): ({self.sampled_idx}, {self.current_step}) | predicted movie_id: {movie_id} | reward: {self.reward:.2f}")
             # time.sleep(0.25)
         self.current_step += 1
-        obs, done, user_feature = self._next_observation()
         self.total_steps += 1
-        return obs, self.reward, done, user_feature, self.total_steps, movie_id
+        if self.personalized_features is not None:
+            obs, done, user_feature = self._next_observation()
+            return obs, self.reward, done, user_feature, self.total_steps, movie_id
+        else:
+            obs, done = self._next_observation()
+            return obs, self.reward, done, self.total_steps, movie_id
+        
+        # return obs, self.reward, done, user_feature, self.total_steps, movie_id
     
     def reset(self):
         self.sampled_idx = random.randint(0, len(self.dataset) - 1)
@@ -80,34 +86,44 @@ class MovieLensEnv(gym.Env):
 
         obs = traj['observations'][self.current_step]
 
-        # if self.personalized_features is not None:
-        user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
+        if self.personalized_features is not None:
+            user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
 
             # print(f"Before injecting personal features, shape of obs: {obs.shape}")
             # print(f"shape of personal feature: {user_feature.shape}")
         # obs = np.hstack((user_feature, obs))
             # print(f"obs with personal features has shape: {obs.shape}")
-        
-        return obs, user_feature
+        if self.personalized_features is not None:
+            return obs, user_feature
+        else:
+            return obs
     
     def _next_observation(self):
         if self.dataset[self.sampled_idx]['terminals'][self.current_step]:
             done = True
-            obs = self.reset()
-            # return obs, done
+            if self.personalized_features is not None:
+                obs, user_feature = self.reset()
+                return obs, done, user_feature
+            else:
+                obs = self.reset()
+                return obs, done
+            
         
         traj = self.dataset[self.sampled_idx]
         user_id = traj['user_id']
         obs = traj['observations'][self.current_step]
-        # if self.personalized_features is not None:
-        user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
+        if self.personalized_features is not None:
+            user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
             # print(f"Before injecting personal features, shape of obs: {obs.shape}")
             # print(f"shape of personal feature: {user_feature.shape}")
 
             # obs = np.hstack((obs, user_feature))
             # print(f"obs with personal features has shape: {obs.shape}")
         done = False
-        return obs, done, user_feature
+        if self.personalized_features is not None:
+            return obs, done, user_feature
+        else:
+            return obs, done
 
     def eval(self):
         self.training = False

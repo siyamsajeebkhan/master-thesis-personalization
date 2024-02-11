@@ -90,10 +90,14 @@ def evaluate_episode_rtg(
     state_mean = torch.from_numpy(state_mean).to(device=device)
     state_std = torch.from_numpy(state_std).to(device=device)
 
-    user_features_mean = torch.from_numpy(user_features_mean).to(device=device)
-    user_features_std = torch.from_numpy(user_features_std).to(device=device)
+    if user_features_mean is not None and user_features_std is not None:
+        user_features_mean = torch.from_numpy(user_features_mean).to(device=device)
+        user_features_std = torch.from_numpy(user_features_std).to(device=device)
 
-    state, user_feature = env.reset()
+    if user_features_mean is not None and user_features_std is not None:
+        state, user_feature = env.reset()
+    else:
+        state = env.reset()
     # print(f"sampled state.shape: {state.shape}, type: {type(state)} and user_feature.shape: {user_feature.shape}, type: {type(user_feature)}")
     # if use_prev_temp_feat == 'no':
     #     state = state[0:39]
@@ -105,7 +109,9 @@ def evaluate_episode_rtg(
     states = torch.from_numpy(state).reshape(1, state_dim).to(device=device, dtype=torch.float32)
     actions = torch.empty((0, act_dim), device=device, dtype=torch.float32)
     rewards = torch.zeros(0, device=device, dtype=torch.float32)
-    user_features = torch.from_numpy(user_feature).reshape(1, user_feature.shape[0]).to(device=device, dtype=torch.float32)
+
+    if user_features_mean is not None and user_features_std is not None:
+        user_features = torch.from_numpy(user_feature).reshape(1, user_feature.shape[0]).to(device=device, dtype=torch.float32)
 
     ep_return = target_return
     target_return = torch.tensor(ep_return, device=device, dtype=torch.float32).reshape(1, 1)
@@ -121,18 +127,30 @@ def evaluate_episode_rtg(
     logs = dict()
     # eval_actions = []
     movie_ids = []
+    uniq_movies_predicted_count = 0
     for t in range(max_ep_len):
         actions = torch.cat([actions, torch.zeros((1, act_dim), device=device)], dim=0)
         rewards = torch.cat([rewards, torch.zeros(1, device=device)])
 
-        action = model.get_action(
-            (states.to(dtype=torch.float32) - state_mean) / state_std,
-            actions.to(dtype=torch.float32),
-            rewards.to(dtype=torch.float32),
-            target_return.to(dtype=torch.float32),
-            timesteps.to(dtype=torch.long),
-            (user_features.to(dtype=torch.long) - user_features_mean) / user_features_std,
-        )
+        if user_features_mean is not None and user_features_std is not None:
+            action = model.get_action(
+                (states.to(dtype=torch.float32) - state_mean) / state_std,
+                actions.to(dtype=torch.float32),
+                rewards.to(dtype=torch.float32),
+                target_return.to(dtype=torch.float32),
+                timesteps.to(dtype=torch.long),
+                (user_features.to(dtype=torch.long) - user_features_mean) / user_features_std,
+            )
+
+        else:
+            action = model.get_action(
+                (states.to(dtype=torch.float32) - state_mean) / state_std,
+                actions.to(dtype=torch.float32),
+                rewards.to(dtype=torch.float32),
+                target_return.to(dtype=torch.float32),
+                timesteps.to(dtype=torch.long),
+                None,
+            )
         
 
         actions[-1] = action
@@ -142,16 +160,23 @@ def evaluate_episode_rtg(
         # logs["evaluation/actions"] = actions
         # wandb.log(logs)
 
-
-        state, reward, done, user_feature, _, movie_id= env.step(action)
+        if user_features_mean is not None and user_features_std is not None:
+            state, reward, done, user_feature, _, movie_id= env.step(action)
+        else:
+            state, reward, done, _, movie_id= env.step(action)
         movie_ids.append(movie_id)
-        
+        if done or t == max_ep_len-1:
+            uniq_movies_predicted_count += len(set(movie_ids))
+            # print(f"Total unique movies predicted for this user: {len(set(movie_ids))}")
+            # print(f"Total unique movies predicted : {uniq_movies_predicted_count}")
+            movie_ids = []
         cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
 
-        cur_user_feature = torch.from_numpy(user_feature).to(device=device).reshape(1, user_feature.shape[0])
-        user_features = torch.cat([user_features, cur_user_feature], dim=0)
-        rewards[-1] = reward
+        if user_features_mean is not None and user_features_std is not None:
+            cur_user_feature = torch.from_numpy(user_feature).to(device=device).reshape(1, user_feature.shape[0])
+            user_features = torch.cat([user_features, cur_user_feature], dim=0)
+            rewards[-1] = reward
         
         # if target_rating == pred_rating:
         #     episode_corr_samples += 1
@@ -177,5 +202,5 @@ def evaluate_episode_rtg(
     # wandb.log(logs)
     # eval_action_loss = np.sum((np.array(target_actions) - np.array(pred_actions))**2)
     # episode_acc = (episode_corr_samples / max_ep_len)
-    return episode_return, episode_length, movie_ids
+    return episode_return, episode_length, movie_ids, uniq_movies_predicted_count
 
