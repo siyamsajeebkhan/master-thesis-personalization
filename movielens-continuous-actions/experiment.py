@@ -54,17 +54,6 @@ def experiment(
         print("Using personalized embeddings")
         user_specific_features = pd.read_csv('../data/dt-datasets/movielens/personal-features/personal_features_mlens_users_v1.csv')
 
-        # for traj in trajectories:
-        #     user_id = traj['user_id']
-        #     user_feature = user_specific_features[user_specific_features['userId'] == user_id].values
-            
-        #     observations = traj['observations']
-        #     arr_tiled = np.tile(user_feature, (observations.shape[0], 1))
-        #     traj['observations'] = np.concatenate((observations, arr_tiled), axis=1)
-            # print(f"traj['observations'].shape: {traj['observations'].shape}")
-        # pass
-
-
     
     env_name, dataset = variant['env'], variant['dataset']
     num_steps_per_iter = variant['num_steps_per_iter']
@@ -78,6 +67,7 @@ def experiment(
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
+
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns, actions = [], [], [], []
@@ -97,7 +87,6 @@ def experiment(
     num_timesteps = sum(traj_lens) + 1e-6
 
     user_embedding_dim = None
-
     user_features_mean = None
     user_features_std = None
     if user_specific_features is not None:
@@ -105,11 +94,7 @@ def experiment(
         user_features_std = np.array(user_specific_features.std())
         user_embedding_dim = user_specific_features.shape[1]
         
-    # print(state_mean.shape, type(state_mean), user_features_mean.shape, type(user_features_mean))
     state_dim = states.shape[1]
-
-    # if variant['fusion_strategy'] == 'cross':
-    #     state_dim = states.shape[1] - user_specific_features.shape[1]
     act_dim = actions[0].shape[1]
     
     max_return = np.max(returns)
@@ -216,7 +201,6 @@ def experiment(
         s, a, r, d, rtg, timesteps, mask, user_embeddings = [], [], [], [], [], [], [], []
         for i in range(batch_size):
             traj = trajectories[int(sorted_inds[batch_inds[i]])]
-            # print(f"traj keys: {traj.keys()}")
             si = random.randint(0, traj['rewards'].shape[0] - 1)
             sampled_states = traj['observations'][si:si + max_len]
             sampled_traj_lens_per_user.append(len(sampled_states))
@@ -248,13 +232,10 @@ def experiment(
             mask.append(np.concatenate([np.zeros((1, max_len - tlen)), np.ones((1, tlen))], axis=1))
             if use_personalized_embeddings == 'yes':
                 uem = (user_specific_features[user_specific_features['userId'] == traj['user_id']].values)
-                # uem = (user_specific_features[user_specific_features['userId'] == traj['user_id']].values - user_features_mean) / user_features_std
-                # print(uem.shape, s.shape)
                 user_embeddings.append(uem.reshape(1, -1, uem.shape[1]))
                 user_embeddings[-1] = np.concatenate([np.zeros((1, max_len - 1, uem.shape[1])), user_embeddings[-1]], axis=1)
-                # print(f"len(user_embeddings) before norm: {len(user_embeddings)} and shape: {user_embeddings[-1].shape}")
                 user_embeddings[-1] = (user_embeddings[-1] - user_features_mean)/user_features_std
-        # print(f"states length before concatenation: {len(s)} and shape: {s[0].shape}")
+        
         s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
         a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
         r = torch.from_numpy(np.concatenate(r, axis=0)).to(dtype=torch.float32, device=device)
@@ -264,17 +245,12 @@ def experiment(
         mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
 
         if use_personalized_embeddings == 'yes':
-            # print(f"user_embeddings length: {len(user_embeddings)} and shape: {user_embeddings[0].shape}")
-            # print(f"Using personalized embeddings in get_batch")
             user_embeddings = torch.from_numpy(np.concatenate(user_embeddings, axis=0)).to(dtype=torch.float32, device=device)
-            # print(f"states shape: {s.shape}, user_embeddings.shape: {user_embeddings.shape}")
         return s, a, r, d, rtg, timesteps, mask, user_embeddings
 
     def eval_episodes(target_rew):
         def fn(model):
             returns, lengths = [], []
-            # eval_action_errors = []
-            # all_pred_movie_ids = [] 
             uniq_movies_predicted_counts = []
             for _ in tqdm(range(num_eval_episodes), disable=False):
                 with torch.no_grad():
@@ -335,7 +311,6 @@ def experiment(
             act_dim=act_dim,
             action_vocab = action_vocab,
             max_length=K,
-            # vocab_size=1,
             max_ep_len=max_ep_len,
             user_embedding_dim=user_embedding_dim,
             hidden_size=variant['embed_dim'],
@@ -346,7 +321,6 @@ def experiment(
             n_positions=1024,
             resid_pdrop=variant['dropout'],
             attn_pdrop=variant['dropout'],
-            # use_personalized_embeddings=variant['use_personalized_embeddings'],
             fusion_strategy=variant['fusion_strategy'],
         )
     elif model_type == 'bc':

@@ -57,22 +57,6 @@ class DecisionTransformer(TrajectoryModel):
         )
         self.predict_return = torch.nn.Linear(hidden_size, 1)
 
-        # self.crossattention = Attention(nx=128, n_ctx=self.config.n_ctx, config=self.config, scale=False, is_cross_attention=True).to('cuda')
-        # self.ln_cross_attn = nn.LayerNorm(128, eps=self.config.layer_norm_epsilon).to('cuda')
-
-        # self.config.add_cross_attention=True
-
-        
-        # self.block = Block(n_ctx=self.config.n_ctx, config=self.config, scale=False)
-
-    # def cross_attention_based_fusion(states, user_embeddings):
-    #     pass
-
-    # def fuse_user_embeddings(states, user_embeddings, strategy='cross'):
-    #     if strategy == 'early':
-    #         states = states + user_embeddings
-    #     if strategy == 'cross':
-    #         states = cross_attention_based_fusion(states, user_embeddings)
     
     def forward(self, states, actions, rewards, returns_to_go, timesteps, attention_mask=None, user_embeddings=None):
         batch_size, seq_length = states.shape[0], states.shape[1]
@@ -93,6 +77,7 @@ class DecisionTransformer(TrajectoryModel):
         state_embeddings = state_embeddings + time_embeddings
         action_embeddings = action_embeddings + time_embeddings
         returns_embeddings = returns_embeddings + time_embeddings
+
         if user_embeddings is not None and len(user_embeddings) != 0 and self.config.fusion_strategy == 'early':
             # print(f"taking steps for early fusion")
             user_embeddings = self.embed_users(user_embeddings)
@@ -110,8 +95,6 @@ class DecisionTransformer(TrajectoryModel):
             (attention_mask, attention_mask, attention_mask), dim=1
         ).permute(0, 2, 1).reshape(batch_size, 3*seq_length)
 
-        # print(f"stacked_inputs.shape: {stacked_inputs.shape} and attention_mask shape: {stacked_attention_mask.shape}")
-        # we feed in the input embeddings (not word indices as in NLP) to the model
 
         if self.config.fusion_strategy == 'cross':
             # print(f"Doing cross-attention")
@@ -140,41 +123,10 @@ class DecisionTransformer(TrajectoryModel):
             
             
         x = transformer_outputs['last_hidden_state']
-        # print(f"x from transformer outputs shape: {x.shape}")
-
 
         # reshape x so that the second dimension corresponds to the original
         # returns (0), states (1), or actions (2); i.e. x[:,1,t] is the token for s_t
         x = x.reshape(batch_size, seq_length, 3, self.hidden_size).permute(0, 2, 1, 3)
-        # print(f"transformed state shape: {x[:,1].shape}")
-        # transformed_states = x[:,1]
-
-        # print(f"config: {self.config}")
-        # if self.config.fusion_strategy == "cross":
-        #     stacked_attention_mask = torch.stack(
-        #     (attention_mask, attention_mask), dim=1).permute(0, 2, 1).reshape(batch_size, 2*seq_length)
-        #     encoder_hidden_states = user_embeddings
-
-        #     print(f"hidden_states shape: {x[:,1].shape}, encoder_hidden_states.shape: {encoder_hidden_states.shape}, attention_mask.shape: {attention_mask.shape}")
-        #     # pass
-
-        #     hidden_states = x[:,1]
-        #     print(f"hidden_states.device: {hidden_states.device}")
-        #     encoder_hidden_states = nn.functional.pad(encoder_hidden_states, (0, hidden_states.shape[2] - encoder_hidden_states.shape[2]))
-
-        #     cross_attn_outputs = self.block(hidden_states=hidden_states, attention_mask=attention_mask, encoder_hidden_states=encoder_hidden_states,)
-        #     # cross_attn_outputs = crossattention(
-        #     #     ln_cross_attn(hidden_states.to('cuda')),
-        #     #     attention_mask=stacked_attention_mask,
-        #     #     head_mask=None,
-        #     #     encoder_hidden_states=encoder_hidden_states,
-        #     #     encoder_attention_mask=None,
-        #     #     output_attentions=False,
-        #     # )
-        #     # # pass
-        #     print(f"ATTENTION OUTPUT: {cross_attn_outputs.shape}")
-        #     x[:,1] = cross_attn_outputs
-
 
         # get predictions
         return_preds = self.predict_return(x[:,2])  # predict next return given state and action

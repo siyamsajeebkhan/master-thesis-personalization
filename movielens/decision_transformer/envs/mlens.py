@@ -16,7 +16,7 @@ class CustomActionSpace(Space):
     
 class MovieLensEnv(gym.Env):
     
-    def __init__(self, test_traj_path, use_prev_temp_as_feature=False, van_specific_embeddings=None, pbar=None):
+    def __init__(self, test_traj_path, use_prev_temp_as_feature=False, user_specific_features=None, reward_scheme=None, pbar=None):
         # print("__init__ method")
         # with open('../gym/data/mlens/mlens-test-trajectories-v1.pkl', 'rb') as f:
         with open(test_traj_path, 'rb') as f:
@@ -34,8 +34,8 @@ class MovieLensEnv(gym.Env):
         self.pbar = pbar
         self.total_steps = 0
         self.use_prev_temp = use_prev_temp_as_feature
-        # self.idx_of_prev_temp_feat = np.where(self.dataset[0]['features'] == 'd_prev_target_temp')[0][0]
-        self.personalized_features = van_specific_embeddings
+        self.personalized_features = user_specific_features
+        self.reward_scheme = reward_scheme
 
     def step(self, action):
         self.action = action
@@ -47,20 +47,23 @@ class MovieLensEnv(gym.Env):
         if pred_rating == target_rating:
             acc = 1
 
-        # # Rewards scheme 5
-        # # -------------------------------
-        # error = abs(target_rating - pred_rating)
-        # self.reward = (1- (error / 4.5)) ** 2
-        # # # -------------------------------
-        
         # Binary Rewards scheme 
         # -------------------------------
-        if target_rating >= 3.5 and pred_rating >= 3.5:
-            self.reward = 1
-        else:
-            self.reward = 0
+        if self.reward_scheme == 'binary':
+            if target_rating >= 3.5 and pred_rating >= 3.5:
+                self.reward = 1
+            else:
+                self.reward = 0
         
         # # -------------------------------
+        # # Rewards scheme 5
+        # # -------------------------------
+        else:
+            error = abs(target_rating - pred_rating)
+            self.reward = (1- (error / 4.5)) ** 2
+        # # # -------------------------------
+
+
         # # Reward for special cases
         # if target_rating != pred_rating:
         #     special_reward = reward
@@ -73,9 +76,14 @@ class MovieLensEnv(gym.Env):
             self.pbar.set_description(f"(idx, step): ({self.sampled_idx}, {self.current_step}) | True rating: {target_rating} | Predicted rating: {pred_rating} | reward: {self.reward:.2f}")
             # time.sleep(0.25)
         self.current_step += 1
-        obs, done = self._next_observation()
         self.total_steps += 1
-        return obs, self.reward, done, acc, target_rating, pred_rating, self.total_steps
+        if self.personalized_features is not None:
+            obs, done, user_feature = self._next_observation()
+            return obs, self.reward, done, acc, target_rating, pred_rating, self.total_steps, user_feature
+        else:
+            obs, done = self._next_observation()
+            return obs, self.reward, done, acc, target_rating, pred_rating, self.total_steps
+
     
     def reset(self):
         self.sampled_idx = random.randint(0, len(self.dataset) - 1)
@@ -87,23 +95,30 @@ class MovieLensEnv(gym.Env):
         obs = traj['observations'][self.current_step]
 
         if self.personalized_features is not None:
-            obs = np.hstack((obs, self.personalized_features[user_id]))
-        
-        return obs
+            user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
+            return obs, user_feature
+        else:
+            return obs
     
     def _next_observation(self):
         if self.dataset[self.sampled_idx]['terminals'][self.current_step]:
             done = True
-            obs = self.reset()
-            return obs, done
+            if self.personalized_features is not None:
+                obs, user_feature = self.reset()
+                return obs, done, user_feature
+            else:
+                obs = self.reset()
+                return obs, done
         
         traj = self.dataset[self.sampled_idx]
         user_id = traj['user_id']
         obs = traj['observations'][self.current_step]
-        if self.personalized_features is not None:
-            obs = np.hstack((obs, self.personalized_features[van_id]))
         done = False
-        return obs, done
+        if self.personalized_features is not None:
+            user_feature = self.personalized_features[self.personalized_features['userId'] == user_id].values.reshape(-1)
+            return obs, done, user_feature
+        else:
+            return obs, done
 
     def eval(self):
         self.training = False

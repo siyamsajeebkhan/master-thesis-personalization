@@ -98,9 +98,7 @@ def evaluate_episode_rtg(
         state, user_feature = env.reset()
     else:
         state = env.reset()
-    # print(f"sampled state.shape: {state.shape}, type: {type(state)} and user_feature.shape: {user_feature.shape}, type: {type(user_feature)}")
-    # if use_prev_temp_feat == 'no':
-    #     state = state[0:39]
+
     if mode == 'noise':
         state = state + np.random.normal(0, 0.1, size=state.shape)
 

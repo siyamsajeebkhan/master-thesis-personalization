@@ -31,9 +31,11 @@ def experiment(
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
-    dataset_path = "../data/dt-datasets/movielens/train-test-sets/mlens-train-trajectories-v1_with_binary_reward_wo_tags_and_summed.pkl"
+    reward_scheme = variant['reward_scheme']
+    train_dataset_path = f"/home/ssk/Desktop/master-thesis/master-thesis-personalization/offline-rl-experiments/data/train_data_with_{reward_scheme}_rewards.pkl"
 
-    with open(dataset_path, 'rb') as f:
+    test_set_path = f"/home/ssk/Desktop/master-thesis/master-thesis-personalization/offline-rl-experiments/data/test_data_with_{reward_scheme}_rewards.pkl"
+    with open(train_dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
 
     if variant['use_prev_temp_as_feature'] == 'no':
@@ -42,32 +44,27 @@ def experiment(
     # Uncomment the following lines for running with van specific embeddings
     user_specific_features = None
     if variant['use_personalized_embeddings'] == 'yes':
-        # print("Using personalized embeddings")
-        # with open('../data/embeddings/van_specific_embeddings.pkl', 'rb') as f:
-        #     user_specific_features = pickle.load(f)
-        # for traj in trajectories:
-        #     van_id = traj['van_id']
-        #     van_feature = user_specific_features[van_id]
-            
-        #     observations = traj['observations']
-        #     arr_tiled = np.tile(van_feature, (observations.shape[0], 1))
-        #     traj['observations'] = np.concatenate((observations, arr_tiled), axis=1)
-        pass
+        print("Using personalized embeddings")
+        user_specific_features = pd.read_csv('../data/dt-datasets/movielens/personal-features/personal_features_mlens_users_v1.csv')
 
-    test_set_path = "../data/dt-datasets/movielens/train-test-sets/mlens-test-trajectories-v1_with_binary_reward_wo_tags_and_summed.pkl"
+
+
     
     env_name, dataset = variant['env'], variant['dataset']
     num_steps_per_iter = variant['num_steps_per_iter']
     context_length = variant['K']
     model_type = variant['model_type']
+    fusion_strategy = variant['fusion_strategy']
+    use_personalized_embeddings = variant['use_personalized_embeddings']
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y-%H:%M:%S.%s")
-    group_name = f'{exp_prefix}-{env_name}-{dataset}'
+    group_name = f'{exp_prefix}-{reward_scheme}-{fusion_strategy}-PE-{use_personalized_embeddings}'
     # exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
     exp_prefix = f'{group_name}-num_steps_per_iter:{num_steps_per_iter}-context_length:{context_length}-num_iters:{variant["max_iters"]}-{dt_string}'
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
+
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns, actions = [], [], [], []
@@ -85,12 +82,19 @@ def experiment(
     states = np.concatenate(states, axis=0)
     state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
     num_timesteps = sum(traj_lens)
-    
+
+    user_embedding_dim = None
+    user_features_mean = None
+    user_features_std = None
+    if user_specific_features is not None:
+        user_features_mean  = np.array(user_specific_features.mean())
+        user_features_std = np.array(user_specific_features.std())
+        user_embedding_dim = user_specific_features.shape[1]
+
     state_dim = states.shape[1]
     act_dim = 1
     unique_actions = np.unique(np.concatenate(actions))
     total_actions = unique_actions.shape[0]
-    # total_actions = 49
     
     max_return = np.max(returns)
     max_ret_traj_idx = np.argmax(returns)
@@ -147,7 +151,7 @@ def experiment(
         # env_targets = [max_ep_len*1, max_ep_len*0.7]
         env_targets = [max_ep_len]
         pbar = tqdm(range(max_ep_len), disable=False)
-        env = MovieLensEnv(test_set_path, use_prev_temp_as_feature=variant['use_prev_temp_as_feature'], van_specific_embeddings=user_specific_features, pbar=pbar)
+        env = MovieLensEnv(test_set_path, use_prev_temp_as_feature=variant['use_prev_temp_as_feature'], user_specific_features=user_specific_features, reward_scheme=reward_scheme, pbar=pbar)
         scale = 1
     else:
         raise NotImplementedError
@@ -172,7 +176,8 @@ def experiment(
     # used to reweight sampling so we sample according to timesteps instead of trajectories
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
-    def get_batch(batch_size=256, max_len=K, train=True):
+    sampled_traj_lens_per_user = []
+    def get_batch(use_personalized_embeddings, batch_size=256, max_len=K, train=True):
         batch_inds = np.random.choice(
             np.arange(num_trajectories),
             size=batch_size,
@@ -180,11 +185,13 @@ def experiment(
             p=p_sample,  # reweights so we sample according to timesteps
         )
 
-        s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
+        s, a, r, d, rtg, timesteps, mask, user_embeddings = [], [], [], [], [], [], [], []
         for i in range(batch_size):
             traj = trajectories[int(sorted_inds[batch_inds[i]])]
             si = random.randint(0, traj['rewards'].shape[0] - 1)
             sampled_states = traj['observations'][si:si + max_len]
+            sampled_traj_lens_per_user.append(len(sampled_states))
+
 
             # get sequences from dataset
             s.append(sampled_states.reshape(1, -1, state_dim))
@@ -211,6 +218,13 @@ def experiment(
             timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
             mask.append(np.concatenate([np.zeros((1, max_len - tlen)), np.ones((1, tlen))], axis=1))
 
+            if use_personalized_embeddings == 'yes':
+                uem = (user_specific_features[user_specific_features['userId'] == traj['user_id']].values)
+                user_embeddings.append(uem.reshape(1, -1, uem.shape[1]))
+                user_embeddings[-1] = np.concatenate([np.zeros((1, max_len - 1, uem.shape[1])), user_embeddings[-1]], axis=1)
+                user_embeddings[-1] = (user_embeddings[-1] - user_features_mean)/user_features_std
+
+
         s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
         a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
         r = torch.from_numpy(np.concatenate(r, axis=0)).to(dtype=torch.float32, device=device)
@@ -218,8 +232,10 @@ def experiment(
         rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
         timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
         mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
-        # print(f"actions.min and max: {a.min(), a.max()}")
-        return s, a, r, d, rtg, timesteps, mask
+
+        if use_personalized_embeddings == 'yes':
+            user_embeddings = torch.from_numpy(np.concatenate(user_embeddings, axis=0)).to(dtype=torch.float32, device=device)
+        return s, a, r, d, rtg, timesteps, mask, user_embeddings
 
     def eval_episodes(target_rew):
         def fn(model):
@@ -240,6 +256,8 @@ def experiment(
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
+                            user_features_mean=user_features_mean,
+                            user_features_std=user_features_std,
                             device=device,
                             use_prev_temp_feat=variant['use_prev_temp_as_feature'],
                         )
@@ -296,6 +314,7 @@ def experiment(
             act_dim=act_dim,
             max_length=K,
             vocab_size=total_actions,
+            user_embedding_dim=user_embedding_dim,
             max_ep_len=max_ep_len,
             hidden_size=variant['embed_dim'],
             n_layer=variant['n_layer'],
@@ -305,6 +324,7 @@ def experiment(
             n_positions=1024,
             resid_pdrop=variant['dropout'],
             attn_pdrop=variant['dropout'],
+            fusion_strategy=variant['fusion_strategy'],
         )
     elif model_type == 'bc':
         model = MLPBCModel(
@@ -339,6 +359,7 @@ def experiment(
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
+            use_personalized_embeddings = variant['use_personalized_embeddings'],
         )
     elif model_type == 'bc':
         trainer = ActTrainer(
@@ -360,10 +381,15 @@ def experiment(
         )
         # wandb.watch(model)  # wandb has some bug
 
+    return_from_iters = []
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
+        iter_return = outputs[f"evaluation/target_{variant['max_ep_len']}_overall_return_mean"]
+        return_from_iters.append(iter_return)
         if log_to_wandb:
             wandb.log(outputs)
+    print(f"For the setting of {group_name}_{exp_prefix}")
+    print(f"Average reward achieved from all the iters: {np.mean(return_from_iters)} and the STD: {np.std(return_from_iters)}")
 
 
 if __name__ == '__main__':
@@ -383,7 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
-    parser.add_argument('--num_eval_episodes', type=int, default=20)
+    parser.add_argument('--num_eval_episodes', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=10)
     parser.add_argument('--num_steps_per_iter', type=int, default=1000)
     parser.add_argument('--max_ep_len', type=int, default=100)
@@ -391,7 +417,9 @@ if __name__ == '__main__':
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     parser.add_argument('--use_prev_temp_as_feature', type=str, default='no')
     parser.add_argument('--use_personalized_embeddings', type=str, default='no')
+    parser.add_argument('--fusion_strategy', type=str, default='early')
+    parser.add_argument('--reward_scheme', type=str, default='naive')
 
     args = parser.parse_args()
 
-    experiment('movielens-experiment-with-binary-reward-and-wo-tags-summed-up-embeddings', variant=vars(args))
+    experiment('movielens-experiment-with-discrete-actions', variant=vars(args))
