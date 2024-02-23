@@ -1,4 +1,4 @@
-name: decision-transformer-climate
+name: decision-transformer-mlens
 channels:
   # - defaults
   - pytorch
