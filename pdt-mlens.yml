@@ -1,4 +1,4 @@
-name: decision-transformer-mlens
+name: pdt
 channels:
   # - defaults
   - pytorch

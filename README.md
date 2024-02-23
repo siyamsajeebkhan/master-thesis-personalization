@@ -20,22 +20,12 @@ Install miniconda or conda following these instructions: <br>
 
 Install the dependencies and activate the virtual environment:
 ```
-conda env create -f dt_climate.yml
-conda activate decision-transformer-climate
+conda env create -f pdt-mlens.yml
+conda activate pdt
 ```
 
 ### Running the experiments:<br>
-There are four options to run the experiments <br>
-a) With previous temperature as a feature and with personalized embeddings <br>
-b) With previous temperature as a feature and without personalized embeddings <br>
-c) Without previous temperature as a feature and with personalized embeddings <br>
-d) Without previous temperature as a feature and without personalized embeddings <br>
-
-You can pass these as command line arguments. For instance for option a)
 ```
-cd smart-climate
-python experiment.py --use_personalized_embeddings yes --use_prev_temp_as_feature yes
+cd movielens-continuous-actions
+python experiment.py --action_embed_shape 32 --use_personalized_embeddings yes --fusion_strategy cross --num_steps_per_iter 1000 --log_to_wandb True --K 20 --max_iters 10  --num_eval_episodes 10
 ```
-### Notebooks:
-1. [EDA-smart-climate-data-clean.ipynb](https://atc-github.azure.cloud.bmw/ice/mlp-master-thesis-personalization/blob/main/Notebooks/EDA-smart-climate-data-clean.ipynb) - for exploratory data analysis of the climate data
-2. [smart_climate_data_prep_clean.ipynb](https://atc-github.azure.cloud.bmw/ice/mlp-master-thesis-personalization/blob/main/Notebooks/smart_climate_data_prep_clean.ipynb) - for contextual and personalized feature creation. 
