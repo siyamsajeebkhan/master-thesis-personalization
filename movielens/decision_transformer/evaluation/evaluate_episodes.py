@@ -74,6 +74,8 @@ def evaluate_episode_rtg(
         scale=1000.,
         state_mean=0.,
         state_std=1.,
+        user_features_mean=0.,
+        user_features_std=1.,
         device='cuda',
         target_return=None,
         mode='normal',
@@ -86,7 +88,14 @@ def evaluate_episode_rtg(
     state_mean = torch.from_numpy(state_mean).to(device=device)
     state_std = torch.from_numpy(state_std).to(device=device)
 
-    state = env.reset()
+    if user_features_mean is not None and user_features_std is not None:
+        user_features_mean = torch.from_numpy(user_features_mean).to(device=device)
+        user_features_std = torch.from_numpy(user_features_std).to(device=device)
+
+    if user_features_mean is not None and user_features_std is not None:
+        state, user_feature = env.reset()
+    else:
+        state = env.reset()
 
     # if use_prev_temp_feat == 'no':
     #     state = state[0:39]
@@ -98,6 +107,9 @@ def evaluate_episode_rtg(
     states = torch.from_numpy(state).reshape(1, state_dim).to(device=device, dtype=torch.float32)
     actions = torch.empty((0, act_dim), device=device, dtype=torch.float32)
     rewards = torch.zeros(0, device=device, dtype=torch.float32)
+
+    if user_features_mean is not None and user_features_std is not None:
+        user_features = torch.from_numpy(user_feature).reshape(1, user_feature.shape[0]).to(device=device, dtype=torch.float32)
 
     ep_return = target_return
     target_return = torch.tensor(ep_return, device=device, dtype=torch.float32).reshape(1, 1)
@@ -116,27 +128,42 @@ def evaluate_episode_rtg(
         actions = torch.cat([actions, torch.zeros((1, act_dim), device=device)], dim=0)
         rewards = torch.cat([rewards, torch.zeros(1, device=device)])
 
-        action = model.get_action(
-            (states.to(dtype=torch.float32) - state_mean) / state_std,
-            actions.to(dtype=torch.float32),
-            rewards.to(dtype=torch.float32),
-            target_return.to(dtype=torch.float32),
-            timesteps.to(dtype=torch.long),
-            use_action_amebeddings=True,
-        )
-        
+        if user_features_mean is not None and user_features_std is not None:
+            action = model.get_action(
+                (states.to(dtype=torch.float32) - state_mean) / state_std,
+                actions.to(dtype=torch.float32),
+                rewards.to(dtype=torch.float32),
+                target_return.to(dtype=torch.float32),
+                timesteps.to(dtype=torch.long),
+                (user_features.to(dtype=torch.long) - user_features_mean) / user_features_std,
+            )
+        else:
+            action = model.get_action(
+                (states.to(dtype=torch.float32) - state_mean) / state_std,
+                actions.to(dtype=torch.float32),
+                rewards.to(dtype=torch.float32),
+                target_return.to(dtype=torch.float32),
+                timesteps.to(dtype=torch.long),
+                None,
+            )
 
         actions[-1] = action
+
+
         action = action.detach().cpu().item()
         eval_actions.append(action)
-        # logs["evaluation/actions"] = actions
-        # wandb.log(logs)
-
-
-        state, reward, done, _, target_rating, pred_rating, _ = env.step(action)
-        
+        if user_features_mean is not None and user_features_std is not None:
+            state, reward, done, _, target_rating, pred_rating, _, user_feature = env.step(action)
+        else:
+            state, reward, done, _, target_rating, pred_rating, _ = env.step(action)
         cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
+
+        if user_features_mean is not None and user_features_std is not None:
+            cur_user_feature = torch.from_numpy(user_feature).to(device=device).reshape(1, user_feature.shape[0])
+            user_features = torch.cat([user_features, cur_user_feature], dim=0)
+            rewards[-1] = reward
+
         rewards[-1] = reward
         
         if target_rating == pred_rating:

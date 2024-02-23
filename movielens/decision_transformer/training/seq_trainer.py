@@ -7,13 +7,17 @@ from decision_transformer.training.trainer import Trainer
 class SequenceTrainer(Trainer):
 
     def train_step(self):
-        states, actions, rewards, dones, rtg, timesteps, attention_mask = self.get_batch(self.batch_size)
+        # if self.use_personalized_embeddings == 'yes':
+        #     states, actions, rewards, dones, rtg, timesteps, attention_mask, user_embeddings = self.get_batch(self.use_personalized_embeddings, self.batch_size)
+
+        # if self.use_personalized_embeddings == 'no':
+        states, actions, rewards, dones, rtg, timesteps, attention_mask, user_embeddings = self.get_batch(self.use_personalized_embeddings, self.batch_size)
         
         state_target, action_target, reward_target = torch.clone(states), torch.clone(actions), torch.clone(rewards)
         
         state_preds, action_preds, reward_preds = self.model.forward(
             states, actions, rewards, rtg[:,:-1], timesteps, attention_mask=attention_mask,
-            use_action_embeddings=True,
+            user_embeddings=user_embeddings,
         )
 
         act_dim = action_preds.shape[2]

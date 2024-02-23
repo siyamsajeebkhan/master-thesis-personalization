@@ -98,6 +98,8 @@ class DecisionTransformer(TrajectoryModel):
 
         if self.config.fusion_strategy == 'cross':
             # print(f"Doing cross-attention")
+            user_embeddings = self.embed_users(user_embeddings)
+            user_embeddings = user_embeddings + time_embeddings
             encoder_hidden_states = nn.functional.pad(user_embeddings, (0, self.hidden_size - user_embeddings.shape[2]))
 
             transformer_outputs = self.transformer(
@@ -135,6 +137,7 @@ class DecisionTransformer(TrajectoryModel):
         if self.config.fusion_strategy == 'late':
             # print(f"Now predicting with Late Fusion")
             user_embeddings = self.embed_users(user_embeddings)
+            user_embeddings = user_embeddings + time_embeddings
             x[:,1] = x[:,1] + user_embeddings
         raw_action_preds = self.predict_action(x[:,1])  # predict next action given state
 

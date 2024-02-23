@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 class Trainer:
 
-    def __init__(self, model, optimizer, batch_size, get_batch, loss_fn, scheduler=None, eval_fns=None):
+    def __init__(self, model, optimizer, batch_size, get_batch, loss_fn, scheduler=None, eval_fns=None, use_personalized_embeddings='no'):
         self.model = model
         self.optimizer = optimizer
         self.batch_size = batch_size
@@ -17,6 +17,7 @@ class Trainer:
         self.diagnostics = dict()
 
         self.start_time = time.time()
+        self.use_personalized_embeddings = use_personalized_embeddings
 
     def train_iteration(self, num_steps, iter_num=0, print_logs=False):
 
